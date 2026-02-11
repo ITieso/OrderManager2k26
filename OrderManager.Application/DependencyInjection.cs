@@ -1,5 +1,7 @@
 using FluentValidation;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
+using OrderManager.Application.Behaviors;
 using OrderManager.Application.Interfaces;
 using OrderManager.Application.Services;
 using OrderManager.Domain.Strategies;
@@ -12,20 +14,24 @@ public static class DependencyInjection
     {
         var assembly = typeof(DependencyInjection).Assembly;
 
-        // MediatR - escaneia assembly para Handlers
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
+        // MediatR with Pipeline Behaviors
+        services.AddMediatR(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(assembly);
+            cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        });
 
-        // AutoMapper - escaneia assembly para Profiles
+        // AutoMapper
         services.AddAutoMapper(assembly);
 
-        // Strategies - Singleton pois são stateless
+        // Tax Strategies (Singleton - stateless)
         services.AddSingleton<CurrentTaxStrategy>();
         services.AddSingleton<ReformTaxStrategy>();
 
-        // Factory - Scoped para resolver Feature Flag por request
+        // Tax Strategy Factory (Scoped - depends on Feature Flag per request)
         services.AddScoped<ITaxStrategyFactory, TaxStrategyFactory>();
 
-        // Validators
+        // FluentValidation Validators
         services.AddValidatorsFromAssembly(assembly);
 
         return services;
