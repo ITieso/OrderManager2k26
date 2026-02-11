@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -23,8 +24,45 @@ try
         .Enrich.FromLogContext()
         .WriteTo.Console());
 
-    // Controllers
-    builder.Services.AddControllers();
+    // Controllers with strict JSON validation
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
+        {
+            // Reject invalid JSON values (letters in numeric fields, etc.)
+            options.JsonSerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict;
+            options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        })
+        .ConfigureApiBehaviorOptions(options =>
+        {
+            // Custom response for model binding/validation errors
+            options.InvalidModelStateResponseFactory = context =>
+            {
+                var errors = context.ModelState
+                    .Where(e => e.Value?.Errors.Count > 0)
+                    .ToDictionary(
+                        e => e.Key,
+                        e => e.Value!.Errors.Select(err =>
+                            string.IsNullOrEmpty(err.ErrorMessage)
+                                ? "Invalid value provided"
+                                : err.ErrorMessage).ToArray()
+                    );
+
+                var problemDetails = new ProblemDetails
+                {
+                    Type = "https://httpstatuses.com/400",
+                    Title = "Invalid Request",
+                    Status = StatusCodes.Status400BadRequest,
+                    Detail = "The request contains invalid data. Please check the errors.",
+                    Instance = context.HttpContext.Request.Path
+                };
+                problemDetails.Extensions["errors"] = errors;
+
+                return new BadRequestObjectResult(problemDetails)
+                {
+                    ContentTypes = { "application/problem+json" }
+                };
+            };
+        });
 
     // Swagger with XML documentation
     builder.Services.AddEndpointsApiExplorer();
@@ -85,6 +123,14 @@ try
                                 g => g.Key,
                                 g => g.Select(e => e.ErrorMessage).ToArray())
                     }
+                },
+                JsonException jsonException => new ProblemDetails
+                {
+                    Type = "https://httpstatuses.com/400",
+                    Title = "Invalid JSON",
+                    Status = StatusCodes.Status400BadRequest,
+                    Detail = $"The request body contains invalid JSON: {jsonException.Message}",
+                    Instance = context.Request.Path
                 },
                 _ => new ProblemDetails
                 {
