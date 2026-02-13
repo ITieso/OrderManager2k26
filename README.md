@@ -134,7 +134,9 @@ OrderManager/
 │
 ├── OrderManager.Infrastructure.Data/
 │   ├── Repositories/
-│   │   └── InMemoryOrderRepository.cs  # ConcurrentDictionary
+│   │   ├── InMemoryOrderRepository.cs  # ConcurrentDictionary
+│   │   └── EfOrderRepository.cs        # Entity Framework
+│   ├── OrderDbContext.cs               # EF DbContext
 │   └── DependencyInjection.cs
 │
 ├── OrderManager.Infrastructure.ExternalServices/
@@ -160,6 +162,7 @@ OrderManager/
     │   ├── TaxStrategyFactoryTests.cs
     │   └── OrderProfileTests.cs
     └── Integration/
+        ├── PostgresFixture.cs              # Testcontainers setup
         └── OrdersControllerIntegrationTests.cs
 ```
 
@@ -171,6 +174,7 @@ OrderManager/
 
 - .NET 8 SDK
 - Visual Studio 2022 / VS Code / Rider
+- Docker Desktop (apenas para testes de integracao)
 
 ### appsettings.json
 
@@ -268,14 +272,30 @@ dotnet test --filter "FullyQualifiedName~Integration"
 dotnet test --collect:"XPlat Code Coverage"
 ```
 
+### Testes de Integracao com Testcontainers
+
+Os testes de integracao utilizam **Testcontainers** para criar um container PostgreSQL automaticamente:
+
+```bash
+# Requer Docker Desktop rodando
+dotnet test --filter "FullyQualifiedName~Integration"
+```
+
+O Testcontainers:
+- Baixa a imagem `postgres:16-alpine` automaticamente
+- Cria um container temporario para os testes
+- Destroi o container apos os testes
+
+> **Nota**: Se Docker nao estiver disponivel, os testes de integracao serao ignorados. Os testes unitarios funcionam normalmente sem Docker.
+
 ### Estrutura de Testes
 
 | Categoria | Quantidade | Descricao |
 |-----------|------------|-----------|
-| Domain | 9 | Strategies, Result Pattern |
-| Application | 12 | Handlers, Factory, AutoMapper |
-| Integration | 10 | API end-to-end |
-| **Total** | **34** | |
+| Domain | 12 | Strategies, Result Pattern |
+| Application | 13 | Handlers, Factory, AutoMapper |
+| Integration | 10 | API end-to-end com PostgreSQL |
+| **Total** | **35** | |
 
 ---
 
@@ -422,9 +442,13 @@ curl https://localhost:5001/api/orders/processed
 | AutoMapper | 12.x | Object Mapping |
 | FluentValidation | 11.x | Validacao |
 | Serilog | 10.x | Logging |
+| Entity Framework Core | 8.x | ORM |
+| Npgsql | 8.x | PostgreSQL Provider |
 | xUnit | 2.x | Testes |
 | FluentAssertions | 8.x | Assertions |
 | NSubstitute | 5.x | Mocking |
+| Bogus | 35.x | Fake Data |
+| Testcontainers | 4.x | Testes de Integracao |
 
 ---
 
